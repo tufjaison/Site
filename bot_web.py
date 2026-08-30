@@ -9,30 +9,30 @@ import threading
 import os
 
 # ==============================================
-# CONFIGURAÇÕES — PODERÃO VIR DO RENDER DEPOIS
+# CONFIGURAÇÕES
 # ==============================================
 API_ID = int(os.environ.get('API_ID', 30406487))
 API_HASH = os.environ.get('API_HASH', 'ccfb152c69274a0424526084b7f96d28')
 NUMERO_CONTA = os.environ.get('NUMERO_CONTA', '+5585992531589')
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8812502952:AAGrFBp0oRatlCuHKpuRmqe794-e3CGi13Q')
-LIMITE_RESULTADOS = 10
+LIMITE_RESULTADOS = 15
 SEU_ID_TELEGRAM = int(os.environ.get('SEU_ID_TELEGRAM', 7637629980))
 
 # ==============================================
-# CLIENTES
+# CLIENTES — NOMES EXATOS DOS ARQUIVOS .session
 # ==============================================
 conta_busca = TelegramClient(
     'sessao_conta_busca',
     API_ID,
     API_HASH,
-    connection_retries=5
+    connection_retries=3
 )
 
 bot = TelegramClient(
     'sessao_bot',
     API_ID,
     API_HASH,
-    connection_retries=5
+    connection_retries=3
 )
 
 # ==============================================
@@ -57,7 +57,7 @@ async def enviar_erro_para_bot(descricao: str, excecao: Exception = None):
             print("⚠️ Não foi possível enviar mensagem de erro")
 
 # ==============================================
-# FUNÇÃO DE BUSCA
+# FUNÇÃO DE BUSCA — COM broadcasts_only=False
 # ==============================================
 async def buscar_videos_globais(termo: str, limite: int = LIMITE_RESULTADOS):
     print(f"🔍 Buscando: '{termo}'")
@@ -67,7 +67,7 @@ async def buscar_videos_globais(termo: str, limite: int = LIMITE_RESULTADOS):
         resultado = await conta_busca(SearchGlobalRequest(
             q=termo,
             filter=InputMessagesFilterVideo(),
-            broadcasts_only=True,
+            broadcasts_only=False,       # ✅ Busca em canais E grupos — MAIS RESULTADOS
             limit=limite,
             min_date=data_inicio,
             max_date=data_limite,
@@ -80,7 +80,8 @@ async def buscar_videos_globais(termo: str, limite: int = LIMITE_RESULTADOS):
             canal = None
             try:
                 canal = await conta_busca.get_entity(msg.peer_id)
-            except:
+            except Exception as e:
+                print(f"⚠️ Não foi possível obter canal: {e}")
                 continue
             link = None
             if canal:
@@ -102,8 +103,10 @@ async def buscar_videos_globais(termo: str, limite: int = LIMITE_RESULTADOS):
                 'link': link,
                 'duracao': duracao
             })
+        print(f"✅ Busca concluída: {len(videos)} vídeo(s) encontrado(s)")
         return videos
     except Exception as e:
+        print(f"❌ Falha na busca '{termo}': {e}")
         await enviar_erro_para_bot(f"Busca falhou: '{termo}'", e)
         return []
 
@@ -115,8 +118,8 @@ async def inicio(event):
     await event.reply(
         "🎬 Busca Global de Vídeos Telegram\n\n"
         "Comandos:\n"
-        "/buscar [termo] — Busca vídeos em canais públicos\n"
-        "Exemplo: /buscar receitas"
+        "/buscar [termo] — Busca vídeos em canais e grupos públicos\n"
+        "Exemplo: /buscar musica"
     )
 
 @bot.on(events.NewMessage(pattern='/buscar'))
@@ -125,14 +128,18 @@ async def comando_buscar(event):
         texto = event.raw_text
         partes = texto.split(maxsplit=1)
         if len(partes) < 2:
-            await event.reply("⚠️ Exemplo: /buscar futebol")
+            await event.reply("⚠️ Exemplo: /buscar musica")
             return
         termo = partes[1].strip()
+        if not termo:
+            await event.reply("⚠️ Digite um termo para buscar. Ex: /buscar futebol")
+            return
         msg_aguarde = await event.reply(f"🔍 Buscando: **{termo}**...")
         videos = await buscar_videos_globais(termo)
         if not videos:
             await msg_aguarde.edit(
-                f"❌ Nenhum vídeo encontrado para: **{termo}**",
+                f"❌ Nenhum vídeo encontrado para: **{termo}**\n"
+                "Tente outro termo mais comum.",
                 parse_mode='markdown'
             )
             return
@@ -143,6 +150,7 @@ async def comando_buscar(event):
         await msg_aguarde.edit(resposta, parse_mode='markdown', link_preview=False)
     except Exception as e:
         await enviar_erro_para_bot("Falha no comando /buscar", e)
+        await event.reply("❌ Ocorreu um erro ao processar sua busca.")
 
 # ==============================================
 # SERVIDOR WEB + BOT
@@ -167,8 +175,8 @@ async def iniciar_bot():
         try:
             await bot.send_message(SEU_ID_TELEGRAM, "bot iniciado")
             print("📤 Mensagem enviada: bot iniciado")
-        except:
-            print("⚠️ Envie /start ao bot primeiro no Telegram")
+        except Exception as e:
+            print(f"⚠️ Não foi possível enviar mensagem de início: {e}")
 
         bot_iniciado = True
         print("👂 Aguardando comandos...")
