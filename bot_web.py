@@ -9,20 +9,17 @@ import threading
 import os
 
 # ==============================================
-# CONFIGURAÇÕES
+# CONFIGURAÇÕES — PODERÃO VIR DO RENDER DEPOIS
 # ==============================================
-API_ID = 30406487
-API_HASH = 'ccfb152c69274a0424526084b7f96d28'
-NUMERO_CONTA = '+5585992531589'
-BOT_TOKEN = '8812502952:AAGrFBp0oRatlCuHKpuRmqe794-e3CGi13Q'
+API_ID = int(os.environ.get('API_ID', 30406487))
+API_HASH = os.environ.get('API_HASH', 'ccfb152c69274a0424526084b7f96d28')
+NUMERO_CONTA = os.environ.get('NUMERO_CONTA', '+5585992531589')
+BOT_TOKEN = os.environ.get('BOT_TOKEN', '8812502952:AAGrFBp0oRatlCuHKpuRmqe794-e3CGi13Q')
 LIMITE_RESULTADOS = 10
-SEU_ID_TELEGRAM = 7637629980
-
-# Detecta se está rodando no PythonAnywhere
-ON_PYTHONANYWHERE = 'PYTHONANYWHERE_SITE' in os.environ
+SEU_ID_TELEGRAM = int(os.environ.get('SEU_ID_TELEGRAM', 7637629980))
 
 # ==============================================
-# CLIENTES — com connection_retries
+# CLIENTES
 # ==============================================
 conta_busca = TelegramClient(
     'sessao_conta_busca',
@@ -39,7 +36,7 @@ bot = TelegramClient(
 )
 
 # ==============================================
-# ENVIAR ERROS DIRETO NO TELEGRAM
+# ENVIAR ERROS PARA O TELEGRAM
 # ==============================================
 async def enviar_erro_para_bot(descricao: str, excecao: Exception = None):
     mensagem = f"❌ ERRO — {descricao}\n"
@@ -148,7 +145,7 @@ async def comando_buscar(event):
         await enviar_erro_para_bot("Falha no comando /buscar", e)
 
 # ==============================================
-# SERVIDOR WEB + BOT — SEM CONFLITO DE PORTA
+# SERVIDOR WEB + BOT
 # ==============================================
 app = Flask(__name__)
 bot_iniciado = False
@@ -199,6 +196,6 @@ if not bot_iniciado:
     threading.Thread(target=run_bot_loop, daemon=True).start()
     print("🚀 Sistema iniciado em segundo plano")
 
-# ⚠️ NÃO usar app.run() no PythonAnywhere — a aba Web já cuida disso!
-if __name__ == '__main__' and not ON_PYTHONANYWHERE:
-    app.run(host='0.0.0.0', port=8000)
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8000))
+    app.run(host='0.0.0.0', port=port)
